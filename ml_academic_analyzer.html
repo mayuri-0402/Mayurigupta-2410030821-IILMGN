@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AcadML — Academic Performance Analyzer</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --surface3: #202d42;
+    --border: rgba(99,132,255,0.12);
+    --border2: rgba(99,132,255,0.22);
+    --text: #e8eaf6;
+    --text2: #8892b0;
+    --text3: #4a5568;
+    --accent: #6384ff;
+    --accent2: #a78bfa;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --teal: #2dd4bf;
+    --pink: #f472b6;
+    --glow: rgba(99,132,255,0.18);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Outfit', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; overflow-x: hidden; }
+
+  /* Ambient bg */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: radial-gradient(ellipse 80% 50% at 20% 0%, rgba(99,132,255,0.08) 0%, transparent 60%),
+                radial-gradient(ellipse 60% 40% at 80% 100%, rgba(167,139,250,0.06) 0%, transparent 60%);
+    pointer-events: none; z-index: 0;
+  }
+
+  /* Layout */
+  .shell { display: grid; grid-template-columns: 220px 1fr; grid-template-rows: 58px 1fr; min-height: 100vh; position: relative; z-index: 1; }
+  .topbar { grid-column: 1/-1; display: flex; align-items: center; padding: 0 28px; border-bottom: 1px solid var(--border); gap: 16px; }
+  .sidebar { border-right: 1px solid var(--border); padding: 20px 0; display: flex; flex-direction: column; gap: 2px; }
+  .main { padding: 28px; overflow-y: auto; }
+
+  /* Logo */
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-icon { width: 30px; height: 30px; background: linear-gradient(135deg, #6384ff, #a78bfa); border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+  .logo-icon svg { width: 18px; height: 18px; fill: #fff; }
+  .logo-text { font-family: 'DM Serif Display', serif; font-size: 18px; color: var(--text); letter-spacing: -0.3px; }
+  .logo-text span { color: var(--accent2); }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 14px; }
+  .badge { font-family: 'DM Mono', monospace; font-size: 11px; background: rgba(99,132,255,0.12); border: 1px solid var(--border2); color: var(--accent); padding: 3px 10px; border-radius: 20px; }
+  .avatar { width: 32px; height: 32px; border-radius: 50%; background: linear-gradient(135deg, #6384ff, #a78bfa); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #fff; }
+
+  /* Sidebar nav */
+  .nav-section { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--text3); padding: 14px 20px 6px; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 20px; font-size: 13.5px; color: var(--text2); cursor: pointer; transition: all .18s; border-left: 2px solid transparent; }
+  .nav-item:hover { color: var(--text); background: rgba(99,132,255,0.06); }
+  .nav-item.active { color: var(--accent); background: rgba(99,132,255,0.1); border-left-color: var(--accent); font-weight: 500; }
+  .nav-icon { width: 16px; opacity: .7; }
+  .nav-item.active .nav-icon { opacity: 1; }
+
+  /* Page sections (tabs) */
+  .page { display: none; }
+  .page.active { display: block; }
+
+  /* Stat cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; position: relative; overflow: hidden; transition: border-color .2s; }
+  .stat-card:hover { border-color: var(--border2); }
+  .stat-card::after { content: ''; position: absolute; bottom: -20px; right: -20px; width: 70px; height: 70px; border-radius: 50%; opacity: .08; }
+  .stat-card.green::after { background: var(--green); }
+  .stat-card.amber::after { background: var(--amber); }
+  .stat-card.red::after { background: var(--red); }
+  .stat-card.accent::after { background: var(--accent); }
+  .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); margin-bottom: 8px; }
+  .stat-val { font-size: 28px; font-weight: 700; letter-spacing: -1px; }
+  .stat-val.green { color: var(--green); }
+  .stat-val.amber { color: var(--amber); }
+  .stat-val.red { color: var(--red); }
+  .stat-val.accent { color: var(--accent); }
+  .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+  .stat-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 500; padding: 2px 8px; border-radius: 20px; margin-top: 8px; }
+  .stat-pill.up { background: rgba(52,211,153,.12); color: var(--green); }
+  .stat-pill.down { background: rgba(248,113,113,.12); color: var(--red); }
+
+  /* Grid layout helpers */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 22px; }
+  .card-title { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .6px; color: var(--text2); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .card-title .dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Chart canvases */
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* Predict form */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { display: flex; flex-direction: column; gap: 6px; }
+  .form-label { font-size: 12px; color: var(--text2); letter-spacing: .3px; }
+  .form-input { background: var(--surface2); border: 1px solid var(--border); border-radius: 9px; padding: 10px 14px; font-size: 13.5px; color: var(--text); outline: none; font-family: 'Outfit', sans-serif; transition: border-color .18s; }
+  .form-input:focus { border-color: var(--accent); }
+  .form-input[type=range] { padding: 0; background: none; border: none; cursor: pointer; accent-color: var(--accent); }
+  .slider-row { display: flex; align-items: center; gap: 10px; }
+  .slider-val { font-family: 'DM Mono', monospace; font-size: 13px; color: var(--accent); min-width: 40px; text-align: right; }
+  .btn-predict { margin-top: 20px; width: 100%; padding: 13px; background: linear-gradient(135deg, #6384ff, #a78bfa); border: none; border-radius: 10px; color: #fff; font-size: 15px; font-weight: 600; font-family: 'Outfit', sans-serif; cursor: pointer; letter-spacing: .2px; transition: opacity .18s, transform .12s; }
+  .btn-predict:hover { opacity: .9; transform: translateY(-1px); }
+  .btn-predict:active { transform: scale(.98); }
+
+  /* Prediction result */
+  .result-box { margin-top: 20px; border-radius: 12px; padding: 20px; display: none; }
+  .result-box.show { display: block; animation: fadeIn .35s ease; }
+  .result-box.high { background: rgba(52,211,153,.08); border: 1px solid rgba(52,211,153,.25); }
+  .result-box.average { background: rgba(99,132,255,.08); border: 1px solid rgba(99,132,255,.25); }
+  .result-box.risk { background: rgba(251,191,36,.08); border: 1px solid rgba(251,191,36,.25); }
+  .result-box.fail { background: rgba(248,113,113,.08); border: 1px solid rgba(248,113,113,.25); }
+  .result-label { font-size: 12px; text-transform: uppercase; letter-spacing: .7px; color: var(--text2); margin-bottom: 8px; }
+  .result-category { font-size: 22px; font-weight: 700; }
+  .result-category.high { color: var(--green); }
+  .result-category.average { color: var(--accent); }
+  .result-category.risk { color: var(--amber); }
+  .result-category.fail { color: var(--red); }
+  .result-conf { font-size: 13px; color: var(--text2); margin-top: 6px; }
+  .result-advice { margin-top: 12px; font-size: 13px; line-height: 1.6; color: var(--text2); }
+  .conf-bar-bg { height: 6px; background: var(--surface3); border-radius: 3px; margin-top: 10px; }
+  .conf-bar { height: 6px; border-radius: 3px; transition: width .6s ease; }
+
+  /* Model comparison table */
+  .model-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .model-table th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--text3); border-bottom: 1px solid var(--border); font-weight: 500; }
+  .model-table td { padding: 11px 14px; border-bottom: 1px solid rgba(99,132,255,0.06); }
+  .model-table tr:last-child td { border-bottom: none; }
+  .model-table tr.best td { background: rgba(99,132,255,0.05); }
+  .model-name { font-weight: 500; color: var(--text); }
+  .acc-bar-wrap { display: flex; align-items: center; gap: 10px; }
+  .acc-bar-bg { flex: 1; height: 5px; background: var(--surface3); border-radius: 3px; }
+  .acc-bar { height: 5px; border-radius: 3px; }
+  .acc-val { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text2); min-width: 38px; text-align: right; }
+  .model-badge { font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 10px; background: rgba(99,132,255,.15); color: var(--accent); letter-spacing: .5px; }
+  .best-badge { background: rgba(52,211,153,.15); color: var(--green); }
+
+  /* Students table */
+  .students-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .students-table th { text-align: left; padding: 10px 14px; font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--text3); border-bottom: 1px solid var(--border); font-weight: 500; }
+  .students-table td { padding: 11px 14px; border-bottom: 1px solid rgba(99,132,255,0.06); }
+  .students-table tr:hover td { background: rgba(99,132,255,0.04); }
+  .students-table tr:last-child td { border-bottom: none; }
+  .status-chip { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; letter-spacing: .3px; }
+  .chip-high { background: rgba(52,211,153,.12); color: var(--green); }
+  .chip-avg { background: rgba(99,132,255,.12); color: var(--accent); }
+  .chip-risk { background: rgba(251,191,36,.12); color: var(--amber); }
+  .chip-fail { background: rgba(248,113,113,.12); color: var(--red); }
+  .alert-icon { display: inline-flex; width: 16px; height: 16px; border-radius: 50%; background: rgba(248,113,113,.2); align-items: center; justify-content: center; font-size: 10px; color: var(--red); }
+
+  /* Page header */
+  .page-header { margin-bottom: 24px; }
+  .page-title { font-family: 'DM Serif Display', serif; font-size: 24px; letter-spacing: -0.5px; color: var(--text); margin-bottom: 4px; }
+  .page-sub { font-size: 13px; color: var(--text3); }
+
+  /* Upload area */
+  .upload-zone { border: 1.5px dashed var(--border2); border-radius: 14px; padding: 40px; text-align: center; cursor: pointer; transition: all .2s; }
+  .upload-zone:hover { background: rgba(99,132,255,.04); border-color: var(--accent); }
+  .upload-icon { font-size: 32px; margin-bottom: 10px; }
+  .upload-text { font-size: 14px; color: var(--text2); }
+  .upload-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  /* Feature importance bars */
+  .feat-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+  .feat-name { font-size: 12.5px; color: var(--text2); min-width: 130px; }
+  .feat-bar-bg { flex: 1; height: 7px; background: var(--surface3); border-radius: 4px; }
+  .feat-bar { height: 7px; border-radius: 4px; }
+  .feat-pct { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text3); min-width: 36px; text-align: right; }
+
+  /* Alerts section */
+  .alert-card { background: var(--surface); border: 1px solid rgba(248,113,113,.2); border-left: 3px solid var(--red); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
+  .alert-name { font-size: 14px; font-weight: 500; color: var(--text); }
+  .alert-msg { font-size: 12px; color: var(--text3); margin-top: 2px; }
+  .alert-time { font-family: 'DM Mono', monospace; font-size: 11px; color: var(--text3); margin-left: auto; }
+  .alert-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); flex-shrink: 0; }
+
+  /* Donut chart (pure css) */
+  .donut-wrap { display: flex; align-items: center; gap: 24px; }
+  .donut { width: 120px; height: 120px; flex-shrink: 0; }
+  .donut-legend { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+  .legend-row { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text2); }
+  .legend-swatch { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+  .legend-val { margin-left: auto; font-family: 'DM Mono', monospace; font-size: 12px; color: var(--text); }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.6} }
+  .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- Topbar -->
+  <header class="topbar">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20A10 10 0 0012 2zm0 2a8 8 0 110 16A8 8 0 0112 4zm-1 3v5l4 2-1 1.8-5-2.8V7h2z"/></svg>
+      </div>
+      <span class="logo-text">Acad<span>ML</span></span>
+    </div>
+    <div class="badge"><span class="live-dot"></span>Model Active — Random Forest v2.1</div>
+    <div class="topbar-right">
+      <span style="font-size:12px;color:var(--text3)">AY 2024–25  |  CSE Dept.</span>
+      <div class="avatar">AD</div>
+    </div>
+  </header>
+
+  <!-- Sidebar -->
+  <nav class="sidebar">
+    <div class="nav-section">Overview</div>
+    <div class="nav-item active" onclick="showPage('dashboard')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1H4a1 1 0 01-1-1v-3zm8-8a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1V4zm0 8a1 1 0 011-1h3a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-3z"/></svg>
+      Dashboard
+    </div>
+    <div class="nav-item" onclick="showPage('predict')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Predict
+    </div>
+    <div class="nav-item" onclick="showPage('students')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
+      Students
+    </div>
+    <div class="nav-section">Analytics</div>
+    <div class="nav-item" onclick="showPage('models')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+      ML Models
+    </div>
+    <div class="nav-item" onclick="showPage('alerts')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6zM10 18a3 3 0 01-3-3h6a3 3 0 01-3 3z"/></svg>
+      Alerts
+      <span style="margin-left:auto;background:rgba(248,113,113,.2);color:var(--red);font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;">3</span>
+    </div>
+    <div class="nav-section">Data</div>
+    <div class="nav-item" onclick="showPage('upload')">
+      <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM6.293 6.707a1 1 0 010-1.414l3-3a1 1 0 011.414 0l3 3a1 1 0 01-1.414 1.414L11 5.414V13a1 1 0 11-2 0V5.414L7.707 6.707a1 1 0 01-1.414 0z" clip-rule="evenodd"/></svg>
+      Upload Data
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- === DASHBOARD === -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div class="page-title">Performance Overview</div>
+        <div class="page-sub">Department of Computer Science & Engineering — Semester 5, 2024–25</div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card accent">
+          <div class="stat-label">Total Students</div>
+          <div class="stat-val accent">248</div>
+          <div class="stat-pill up">↑ +12 this semester</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-label">High Performers</div>
+          <div class="stat-val green">89</div>
+          <div class="stat-pill up">↑ 35.9%</div>
+        </div>
+        <div class="stat-card amber">
+          <div class="stat-label">At-Risk Students</div>
+          <div class="stat-val amber">31</div>
+          <div class="stat-pill down">↑ +4 from last sem</div>
+        </div>
+        <div class="stat-card red">
+          <div class="stat-label">Likely to Fail</div>
+          <div class="stat-val red">14</div>
+          <div class="stat-pill down">↑ alerts sent</div>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <!-- Performance trend chart -->
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Performance Trend (Semester Wise)</div>
+          <div class="chart-wrap" style="height:220px;">
+            <canvas id="trendChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Distribution donut -->
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent2)"></span>Category Distribution</div>
+          <div class="donut-wrap" style="margin-top:10px;">
+            <canvas class="donut" id="donutChart"></canvas>
+            <div class="donut-legend">
+              <div class="legend-row"><span class="legend-swatch" style="background:#34d399"></span>High Performer<span class="legend-val">89</span></div>
+              <div class="legend-row"><span class="legend-swatch" style="background:#6384ff"></span>Average<span class="legend-val">114</span></div>
+              <div class="legend-row"><span class="legend-swatch" style="background:#fbbf24"></span>At-Risk<span class="legend-val">31</span></div>
+              <div class="legend-row"><span class="legend-swatch" style="background:#f87171"></span>Likely to Fail<span class="legend-val">14</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Feature importance -->
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Feature Importance (Random Forest)</div>
+          <div style="margin-top:4px;">
+            <div class="feat-row"><span class="feat-name">Attendance %</span><div class="feat-bar-bg"><div class="feat-bar" style="width:92%;background:linear-gradient(90deg,#6384ff,#a78bfa)"></div></div><span class="feat-pct">0.92</span></div>
+            <div class="feat-row"><span class="feat-name">Mid-Term Score</span><div class="feat-bar-bg"><div class="feat-bar" style="width:78%;background:linear-gradient(90deg,#2dd4bf,#6384ff)"></div></div><span class="feat-pct">0.78</span></div>
+            <div class="feat-row"><span class="feat-name">Assignment Score</span><div class="feat-bar-bg"><div class="feat-bar" style="width:65%;background:linear-gradient(90deg,#a78bfa,#f472b6)"></div></div><span class="feat-pct">0.65</span></div>
+            <div class="feat-row"><span class="feat-name">Internal Test 1</span><div class="feat-bar-bg"><div class="feat-bar" style="width:58%;background:linear-gradient(90deg,#fbbf24,#f87171)"></div></div><span class="feat-pct">0.58</span></div>
+            <div class="feat-row"><span class="feat-name">Previous CGPA</span><div class="feat-bar-bg"><div class="feat-bar" style="width:52%;background:linear-gradient(90deg,#34d399,#2dd4bf)"></div></div><span class="feat-pct">0.52</span></div>
+            <div class="feat-row"><span class="feat-name">Internal Test 2</span><div class="feat-bar-bg"><div class="feat-bar" style="width:44%;background:linear-gradient(90deg,#f472b6,#fbbf24)"></div></div><span class="feat-pct">0.44</span></div>
+          </div>
+        </div>
+
+        <!-- Scatter chart proxy: Attendance vs Score -->
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--pink)"></span>Attendance vs Final Score</div>
+          <div class="chart-wrap" style="height:200px;">
+            <canvas id="scatterChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === PREDICT === -->
+    <div class="page" id="page-predict">
+      <div class="page-header">
+        <div class="page-title">Predict Student Performance</div>
+        <div class="page-sub">Enter student data to generate a real-time ML prediction</div>
+      </div>
+
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Student Parameters</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">Student Name</label>
+              <input class="form-input" type="text" id="f-name" placeholder="e.g. Arjun Sharma"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Enrollment No.</label>
+              <input class="form-input" type="text" id="f-enroll" placeholder="e.g. 2023CSE042"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">Attendance % — <span id="att-out">74</span>%</label>
+              <div class="slider-row">
+                <input class="form-input" type="range" id="f-att" min="0" max="100" value="74" oninput="document.getElementById('att-out').textContent=this.value" style="flex:1"/>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Internal Test 1 (out of 30)</label>
+              <input class="form-input" type="number" id="f-t1" min="0" max="30" value="22"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Internal Test 2 (out of 30)</label>
+              <input class="form-input" type="number" id="f-t2" min="0" max="30" value="19"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Assignment Score (out of 20)</label>
+              <input class="form-input" type="number" id="f-assign" min="0" max="20" value="15"/>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Previous CGPA</label>
+              <input class="form-input" type="number" id="f-cgpa" min="0" max="10" step="0.1" value="7.2"/>
+            </div>
+            <div class="form-group" style="grid-column:1/-1">
+              <label class="form-label">ML Algorithm</label>
+              <select class="form-input" id="f-model">
+                <option value="rf">Random Forest (Recommended)</option>
+                <option value="dt">Decision Tree</option>
+                <option value="lr">Logistic Regression</option>
+                <option value="knn">K-Nearest Neighbors</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn-predict" onclick="runPredict()">Run Prediction ▶</button>
+
+          <div class="result-box" id="result-box">
+            <div class="result-label">Predicted Category</div>
+            <div class="result-category" id="res-cat"></div>
+            <div class="result-conf" id="res-conf"></div>
+            <div class="conf-bar-bg"><div class="conf-bar" id="res-bar"></div></div>
+            <div class="result-advice" id="res-advice"></div>
+          </div>
+        </div>
+
+        <!-- Right: model info + mini chart -->
+        <div style="display:flex;flex-direction:column;gap:16px;">
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--green)"></span>Model Performance (Selected)</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:4px;">
+              <div style="background:var(--surface2);border-radius:10px;padding:14px;">
+                <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Accuracy</div>
+                <div style="font-size:24px;font-weight:700;color:var(--green);" id="sel-acc">93.4%</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:10px;padding:14px;">
+                <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">F1-Score</div>
+                <div style="font-size:24px;font-weight:700;color:var(--accent);" id="sel-f1">0.912</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:10px;padding:14px;">
+                <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Precision</div>
+                <div style="font-size:24px;font-weight:700;color:var(--accent2);" id="sel-pre">0.927</div>
+              </div>
+              <div style="background:var(--surface2);border-radius:10px;padding:14px;">
+                <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;">Recall</div>
+                <div style="font-size:24px;font-weight:700;color:var(--teal);" id="sel-rec">0.898</div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-title"><span class="dot" style="background:var(--amber)"></span>Prediction Confidence (Class-wise)</div>
+            <div class="chart-wrap" style="height:160px;">
+              <canvas id="confChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- === STUDENTS === -->
+    <div class="page" id="page-students">
+      <div class="page-header">
+        <div class="page-title">Student Records</div>
+        <div class="page-sub">All students with predicted performance categories</div>
+      </div>
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;">
+          <input class="form-input" type="text" placeholder="Search by name or enrollment..." style="max-width:280px;padding:8px 14px;" oninput="filterStudents(this.value)"/>
+          <select class="form-input" style="max-width:180px;padding:8px 14px;" onchange="filterByCategory(this.value)">
+            <option value="">All Categories</option>
+            <option value="High Performer">High Performer</option>
+            <option value="Average">Average</option>
+            <option value="At-Risk">At-Risk</option>
+            <option value="Likely to Fail">Likely to Fail</option>
+          </select>
+          <span style="margin-left:auto;font-size:12px;color:var(--text3);" id="student-count">Showing 10 of 248</span>
+        </div>
+        <table class="students-table" id="student-table">
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Enroll No.</th>
+              <th>Attendance</th>
+              <th>Avg Score</th>
+              <th>CGPA</th>
+              <th>Prediction</th>
+              <th>Alert</th>
+            </tr>
+          </thead>
+          <tbody id="student-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- === ML MODELS === -->
+    <div class="page" id="page-models">
+      <div class="page-header">
+        <div class="page-title">ML Model Comparison</div>
+        <div class="page-sub">Accuracy, F1-Score and ROC-AUC across all trained classifiers</div>
+      </div>
+
+      <div class="grid-2" style="margin-bottom:16px;">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent)"></span>Accuracy Comparison</div>
+          <div class="chart-wrap" style="height:200px;">
+            <canvas id="modelBarChart"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--green)"></span>ROC-AUC Curves</div>
+          <div class="chart-wrap" style="height:200px;">
+            <canvas id="rocChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--teal)"></span>Detailed Metrics Table</div>
+        <table class="model-table">
+          <thead>
+            <tr><th>Algorithm</th><th>Accuracy</th><th>Precision</th><th>Recall</th><th>F1-Score</th><th>ROC-AUC</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr class="best">
+              <td><span class="model-name">Random Forest</span></td>
+              <td><div class="acc-bar-wrap"><div class="acc-bar-bg"><div class="acc-bar" style="width:93.4%;background:linear-gradient(90deg,#6384ff,#a78bfa)"></div></div><span class="acc-val">93.4%</span></div></td>
+              <td style="color:var(--text2);font-size:13px;">0.927</td>
+              <td style="color:var(--text2);font-size:13px;">0.898</td>
+              <td style="color:var(--text2);font-size:13px;">0.912</td>
+              <td style="color:var(--green);font-size:13px;font-weight:600;">0.971</td>
+              <td><span class="model-badge best-badge">DEPLOYED</span></td>
+            </tr>
+            <tr>
+              <td><span class="model-name">K-Nearest Neighbors</span></td>
+              <td><div class="acc-bar-wrap"><div class="acc-bar-bg"><div class="acc-bar" style="width:88%;background:linear-gradient(90deg,#2dd4bf,#6384ff)"></div></div><span class="acc-val">88.0%</span></div></td>
+              <td style="color:var(--text2);font-size:13px;">0.874</td>
+              <td style="color:var(--text2);font-size:13px;">0.863</td>
+              <td style="color:var(--text2);font-size:13px;">0.868</td>
+              <td style="color:var(--text2);font-size:13px;">0.931</td>
+              <td><span class="model-badge">TRAINED</span></td>
+            </tr>
+            <tr>
+              <td><span class="model-name">Logistic Regression</span></td>
+              <td><div class="acc-bar-wrap"><div class="acc-bar-bg"><div class="acc-bar" style="width:82%;background:linear-gradient(90deg,#a78bfa,#f472b6)"></div></div><span class="acc-val">82.0%</span></div></td>
+              <td style="color:var(--text2);font-size:13px;">0.812</td>
+              <td style="color:var(--text2);font-size:13px;">0.834</td>
+              <td style="color:var(--text2);font-size:13px;">0.823</td>
+              <td style="color:var(--text2);font-size:13px;">0.896</td>
+              <td><span class="model-badge">TRAINED</span></td>
+            </tr>
+            <tr>
+              <td><span class="model-name">Decision Tree</span></td>
+              <td><div class="acc-bar-wrap"><div class="acc-bar-bg"><div class="acc-bar" style="width:78%;background:linear-gradient(90deg,#fbbf24,#f87171)"></div></div><span class="acc-val">78.0%</span></div></td>
+              <td style="color:var(--text2);font-size:13px;">0.762</td>
+              <td style="color:var(--text2);font-size:13px;">0.791</td>
+              <td style="color:var(--text2);font-size:13px;">0.776</td>
+              <td style="color:var(--text2);font-size:13px;">0.854</td>
+              <td><span class="model-badge">TRAINED</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- === ALERTS === -->
+    <div class="page" id="page-alerts">
+      <div class="page-header">
+        <div class="page-title">Risk Alerts</div>
+        <div class="page-sub">Students flagged as At-Risk or Likely to Fail — notified automatically</div>
+      </div>
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-title"><span class="dot" style="background:var(--red)"></span>Active Alerts (3)</div>
+        <div class="alert-card">
+          <div class="alert-dot"></div>
+          <div>
+            <div class="alert-name">Riya Patel — 2023CSE018</div>
+            <div class="alert-msg">Attendance 54% · Internal avg: 11.5/30 · Predicted: <strong style="color:var(--red)">Likely to Fail</strong></div>
+          </div>
+          <div class="alert-time">Today 09:14</div>
+        </div>
+        <div class="alert-card">
+          <div class="alert-dot"></div>
+          <div>
+            <div class="alert-name">Karan Mehta — 2023CSE031</div>
+            <div class="alert-msg">Attendance 61% · Assignment score: 8/20 · Predicted: <strong style="color:var(--red)">Likely to Fail</strong></div>
+          </div>
+          <div class="alert-time">Yesterday 16:42</div>
+        </div>
+        <div class="alert-card" style="border-left-color:var(--amber);border-color:rgba(251,191,36,.2);">
+          <div class="alert-dot" style="background:var(--amber)"></div>
+          <div>
+            <div class="alert-name">Sneha Roy — 2023CSE057</div>
+            <div class="alert-msg">Attendance 68% · CGPA drop from 7.1 to 5.8 · Predicted: <strong style="color:var(--amber)">At-Risk</strong></div>
+          </div>
+          <div class="alert-time">2 days ago</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title"><span class="dot" style="background:var(--amber)"></span>At-Risk Trend</div>
+        <div class="chart-wrap" style="height:200px;">
+          <canvas id="alertChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- === UPLOAD === -->
+    <div class="page" id="page-upload">
+      <div class="page-header">
+        <div class="page-title">Upload Student Data</div>
+        <div class="page-sub">Upload CSV files for batch prediction across departments or semesters</div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--accent)"></span>CSV Bulk Upload</div>
+          <div class="upload-zone" onclick="document.getElementById('csv-input').click()">
+            <div class="upload-icon">📊</div>
+            <div class="upload-text">Drag & drop your CSV file here, or click to browse</div>
+            <div class="upload-sub">Supported format: .csv, .xlsx — max 10MB</div>
+          </div>
+          <input type="file" id="csv-input" accept=".csv,.xlsx" style="display:none" onchange="handleUpload(this)"/>
+          <div id="upload-status" style="margin-top:14px;font-size:13px;color:var(--text3);display:none;"></div>
+
+          <div style="margin-top:20px;">
+            <div class="card-title" style="margin-bottom:10px;"><span class="dot" style="background:var(--teal)"></span>Required CSV Columns</div>
+            <div style="font-family:'DM Mono',monospace;font-size:12px;background:var(--surface2);border-radius:8px;padding:14px;color:var(--teal);line-height:1.8;">
+              student_name, enrollment_no, attendance_pct,<br/>
+              internal_test1, internal_test2,<br/>
+              assignment_score, previous_cgpa
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title"><span class="dot" style="background:var(--green)"></span>Recent Uploads</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+            <div style="background:var(--surface2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;">📄</span>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--text);">sem5_batch_A.csv</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px;">248 records · Processed 28 Mar 2025</div>
+              </div>
+              <span style="margin-left:auto;font-size:11px;color:var(--green);font-weight:600;">DONE</span>
+            </div>
+            <div style="background:var(--surface2);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+              <span style="font-size:20px;">📄</span>
+              <div>
+                <div style="font-size:13px;font-weight:500;color:var(--text);">sem4_batch_B.csv</div>
+                <div style="font-size:11px;color:var(--text3);margin-top:2px;">195 records · Processed 15 Jan 2025</div>
+              </div>
+              <span style="margin-left:auto;font-size:11px;color:var(--green);font-weight:600;">DONE</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ========== NAV ==========
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  event.currentTarget.classList.add('active');
+}
+
+// ========== CHARTS ==========
+const CHART_DEFAULTS = {
+  responsive: true, maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+};
+
+// Trend Line Chart
+new Chart(document.getElementById('trendChart'), {
+  type: 'line',
+  data: {
+    labels: ['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5'],
+    datasets: [
+      { label:'High', data:[71,78,82,85,89], borderColor:'#34d399', backgroundColor:'rgba(52,211,153,.08)', fill:true, tension:.4, pointRadius:4, pointBackgroundColor:'#34d399' },
+      { label:'At-Risk', data:[42,38,35,27,31], borderColor:'#fbbf24', backgroundColor:'rgba(251,191,36,.05)', fill:true, tension:.4, pointRadius:4, pointBackgroundColor:'#fbbf24' },
+      { label:'Fail', data:[22,18,16,10,14], borderColor:'#f87171', backgroundColor:'rgba(248,113,113,.05)', fill:true, tension:.4, pointRadius:4, pointBackgroundColor:'#f87171' },
+    ]
+  },
+  options: { ...CHART_DEFAULTS, scales: {
+    x: { grid: { color:'rgba(99,132,255,.06)' }, ticks: { color:'#8892b0', font:{size:11} } },
+    y: { grid: { color:'rgba(99,132,255,.06)' }, ticks: { color:'#8892b0', font:{size:11} } }
+  }}
+});
+
+// Donut
+new Chart(document.getElementById('donutChart'), {
+  type: 'doughnut',
+  data: {
+    labels: ['High','Average','At-Risk','Fail'],
+    datasets: [{ data:[89,114,31,14], backgroundColor:['#34d399','#6384ff','#fbbf24','#f87171'], borderWidth:0, hoverOffset:4 }]
+  },
+  options: { ...CHART_DEFAULTS, cutout:'72%' }
+});
+
+// Scatter (attendance vs score)
+const scatter = [];
+for(let i=0;i<60;i++){
+  const att = 40+Math.random()*60;
+  const score = Math.min(100, att*0.6 + Math.random()*30 - 5);
+  scatter.push({x:Math.round(att), y:Math.round(score)});
+}
+new Chart(document.getElementById('scatterChart'), {
+  type: 'scatter',
+  data: { datasets: [{ label:'Students', data:scatter, backgroundColor:'rgba(99,132,255,.5)', pointRadius:4 }] },
+  options: { ...CHART_DEFAULTS, scales: {
+    x: { title:{display:true,text:'Attendance %',color:'#8892b0',font:{size:11}}, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}} },
+    y: { title:{display:true,text:'Score %',color:'#8892b0',font:{size:11}}, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}} }
+  }}
+});
+
+// Model bar chart
+new Chart(document.getElementById('modelBarChart'), {
+  type: 'bar',
+  data: {
+    labels: ['Random Forest','KNN','Logistic Reg.','Decision Tree'],
+    datasets: [
+      { label:'Accuracy', data:[93.4,88,82,78], backgroundColor:['#6384ff','#2dd4bf','#a78bfa','#fbbf24'], borderRadius:6 }
+    ]
+  },
+  options: { ...CHART_DEFAULTS, scales: {
+    x: { grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}} },
+    y: { min:65, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}, callback: v => v+'%'} }
+  }}
+});
+
+// ROC line chart
+new Chart(document.getElementById('rocChart'), {
+  type: 'line',
+  data: {
+    labels: [0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1.0],
+    datasets: [
+      { label:'RF 0.971', data:[0,0.12,0.38,0.60,0.74,0.83,0.89,0.93,0.96,0.98,1], borderColor:'#6384ff', tension:.4, pointRadius:0 },
+      { label:'KNN 0.931', data:[0,0.09,0.28,0.48,0.64,0.75,0.83,0.88,0.93,0.97,1], borderColor:'#2dd4bf', tension:.4, pointRadius:0 },
+      { label:'LR 0.896', data:[0,0.07,0.22,0.40,0.55,0.67,0.76,0.83,0.89,0.95,1], borderColor:'#a78bfa', tension:.4, pointRadius:0 },
+      { label:'DT 0.854', data:[0,0.05,0.18,0.33,0.48,0.60,0.70,0.78,0.85,0.93,1], borderColor:'#fbbf24', tension:.4, pointRadius:0 },
+      { label:'Random', data:[0,0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1], borderColor:'rgba(99,132,255,.2)', tension:0, pointRadius:0, borderDash:[4,4] },
+    ]
+  },
+  options: { ...CHART_DEFAULTS, scales: {
+    x: { title:{display:true,text:'FPR',color:'#8892b0',font:{size:11}}, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}} },
+    y: { title:{display:true,text:'TPR',color:'#8892b0',font:{size:11}}, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}} }
+  }, plugins:{legend:{display:true, labels:{color:'#8892b0',boxWidth:12,font:{size:11}}}}  }
+});
+
+// Alert trend
+new Chart(document.getElementById('alertChart'), {
+  type: 'bar',
+  data: {
+    labels:['Sem 1','Sem 2','Sem 3','Sem 4','Sem 5'],
+    datasets:[
+      { label:'At-Risk', data:[42,38,35,27,31], backgroundColor:'rgba(251,191,36,.7)', borderRadius:5 },
+      { label:'Likely to Fail', data:[22,18,16,10,14], backgroundColor:'rgba(248,113,113,.7)', borderRadius:5 },
+    ]
+  },
+  options: { ...CHART_DEFAULTS, scales:{
+    x:{stacked:false, grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}}},
+    y:{grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}}}
+  }, plugins:{legend:{display:true, labels:{color:'#8892b0',boxWidth:12,font:{size:11}}}}}
+});
+
+// Confidence chart (predict page)
+new Chart(document.getElementById('confChart'), {
+  type: 'bar',
+  data: {
+    labels:['High','Average','At-Risk','Fail'],
+    datasets:[{ label:'Confidence', data:[0,0,0,0], backgroundColor:['#34d399','#6384ff','#fbbf24','#f87171'], borderRadius:5 }]
+  },
+  options:{ ...CHART_DEFAULTS, scales:{
+    x:{grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11}}},
+    y:{min:0,max:1,grid:{color:'rgba(99,132,255,.06)'}, ticks:{color:'#8892b0',font:{size:11},callback:v=>Math.round(v*100)+'%'}}
+  }}
+});
+
+// ========== STUDENTS TABLE ==========
+const STUDENTS = [
+  {name:'Arjun Sharma', enroll:'2023CSE001', att:88, score:79, cgpa:8.1, cat:'High Performer'},
+  {name:'Priya Singh', enroll:'2023CSE007', att:92, score:85, cgpa:8.9, cat:'High Performer'},
+  {name:'Rohit Kumar', enroll:'2023CSE012', att:74, score:62, cgpa:6.8, cat:'Average'},
+  {name:'Ananya Rao', enroll:'2023CSE015', att:65, score:54, cgpa:6.2, cat:'At-Risk'},
+  {name:'Riya Patel', enroll:'2023CSE018', att:54, score:38, cgpa:5.1, cat:'Likely to Fail'},
+  {name:'Vikram Das', enroll:'2023CSE022', att:81, score:70, cgpa:7.4, cat:'Average'},
+  {name:'Nisha Gupta', enroll:'2023CSE028', att:90, score:82, cgpa:8.6, cat:'High Performer'},
+  {name:'Karan Mehta', enroll:'2023CSE031', att:61, score:42, cgpa:5.4, cat:'Likely to Fail'},
+  {name:'Divya Nair', enroll:'2023CSE044', att:77, score:66, cgpa:7.1, cat:'Average'},
+  {name:'Sneha Roy', enroll:'2023CSE057', att:68, score:55, cgpa:5.8, cat:'At-Risk'},
+];
+
+function catChip(cat){
+  const map = {'High Performer':'chip-high','Average':'chip-avg','At-Risk':'chip-risk','Likely to Fail':'chip-fail'};
+  return `<span class="status-chip ${map[cat]}">${cat}</span>`;
+}
+
+function renderStudents(data){
+  const tbody = document.getElementById('student-tbody');
+  tbody.innerHTML = data.map(s => `
+    <tr>
+      <td style="font-weight:500;color:var(--text)">${s.name}</td>
+      <td style="font-family:'DM Mono',monospace;font-size:12px;color:var(--text3)">${s.enroll}</td>
+      <td style="color:${s.att<65?'#f87171':s.att<75?'#fbbf24':'#34d399'};font-weight:600">${s.att}%</td>
+      <td style="color:var(--text2)">${s.score}%</td>
+      <td style="font-family:'DM Mono',monospace;color:var(--text2)">${s.cgpa}</td>
+      <td>${catChip(s.cat)}</td>
+      <td>${s.cat==='Likely to Fail'||s.cat==='At-Risk'?'<span class="alert-icon">!</span>':'—'}</td>
+    </tr>
+  `).join('');
+  document.getElementById('student-count').textContent = `Showing ${data.length} of 248`;
+}
+renderStudents(STUDENTS);
+
+function filterStudents(q){
+  const filtered = STUDENTS.filter(s => s.name.toLowerCase().includes(q.toLowerCase()) || s.enroll.includes(q));
+  renderStudents(filtered);
+}
+function filterByCategory(cat){
+  const filtered = cat ? STUDENTS.filter(s => s.cat===cat) : STUDENTS;
+  renderStudents(filtered);
+}
+
+// ========== PREDICT ==========
+const MODEL_STATS = {
+  rf:  {acc:'93.4%', f1:'0.912', pre:'0.927', rec:'0.898'},
+  dt:  {acc:'78.0%', f1:'0.776', pre:'0.762', rec:'0.791'},
+  lr:  {acc:'82.0%', f1:'0.823', pre:'0.812', rec:'0.834'},
+  knn: {acc:'88.0%', f1:'0.868', pre:'0.874', rec:'0.863'},
+};
+
+document.getElementById('f-model').addEventListener('change', function(){
+  const m = MODEL_STATS[this.value];
+  document.getElementById('sel-acc').textContent = m.acc;
+  document.getElementById('sel-f1').textContent  = m.f1;
+  document.getElementById('sel-pre').textContent = m.pre;
+  document.getElementById('sel-rec').textContent = m.rec;
+});
+
+function runPredict(){
+  const att   = parseInt(document.getElementById('f-att').value);
+  const t1    = parseInt(document.getElementById('f-t1').value);
+  const t2    = parseInt(document.getElementById('f-t2').value);
+  const asgn  = parseInt(document.getElementById('f-assign').value);
+  const cgpa  = parseFloat(document.getElementById('f-cgpa').value);
+
+  const score = att*0.35 + (t1/30)*25 + (t2/30)*20 + (asgn/20)*15 + cgpa*5;
+
+  let cat, cls, advice, conf;
+  if(score >= 72){ cat='High Performer'; cls='high'; conf=Math.min(0.98, 0.80+Math.random()*0.15); advice='Excellent trajectory. Keep maintaining attendance and revision habits. Consider advanced electives.'; }
+  else if(score >= 55){ cat='Average'; cls='average'; conf=0.70+Math.random()*0.15; advice='Performing steadily. Improving internal test scores and assignment submissions will push to the next tier.'; }
+  else if(score >= 40){ cat='At-Risk'; cls='risk'; conf=0.65+Math.random()*0.15; advice='Alert generated. Immediate academic counseling recommended. Focus on attendance and test preparation.'; }
+  else { cat='Likely to Fail'; cls='fail'; conf=0.75+Math.random()*0.15; advice='High-priority alert. Remedial classes and parent notification triggered. Faculty intervention required urgently.'; }
+
+  const box = document.getElementById('result-box');
+  box.className = 'result-box show ' + cls;
+  document.getElementById('res-cat').className = 'result-category ' + cls;
+  document.getElementById('res-cat').textContent = cat;
+  document.getElementById('res-conf').textContent = `Model confidence: ${(conf*100).toFixed(1)}%`;
+  document.getElementById('res-bar').style.width = (conf*100)+'%';
+  document.getElementById('res-bar').style.background = cls==='high'?'#34d399':cls==='average'?'#6384ff':cls==='risk'?'#fbbf24':'#f87171';
+  document.getElementById('res-advice').textContent = advice;
+
+  // Update confidence chart
+  const confData = [0.05, 0.08, 0.07, 0.06];
+  if(cls==='high') confData[0]=conf;
+  else if(cls==='average') confData[1]=conf;
+  else if(cls==='risk') confData[2]=conf;
+  else confData[3]=conf;
+  const confChart = Chart.getChart('confChart');
+  confChart.data.datasets[0].data = confData;
+  confChart.update();
+}
+
+// ========== UPLOAD ==========
+function handleUpload(input){
+  if(!input.files.length) return;
+  const f = input.files[0];
+  const status = document.getElementById('upload-status');
+  status.style.display = 'block';
+  status.style.color = 'var(--amber)';
+  status.textContent = `Processing ${f.name}...`;
+  setTimeout(() => {
+    status.style.color = 'var(--green)';
+    status.textContent = `✓ ${f.name} uploaded successfully. Running batch predictions...`;
+  }, 1800);
+}
+</script>
+</body>
+</html>
